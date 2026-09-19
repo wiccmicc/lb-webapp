@@ -1,0 +1,74 @@
+# Практическая работа №2: 3 идентичных экземпляра приложения + общее хранилище Redis.
+#
+#   docker compose up --build            -> app1..app3 (порты 3001-3003) + redis
+#   docker compose --profile demo up     -> дополнительно nginx (порт 8080) с round-robin
+#                                           для локальной проверки распределения запросов
+#
+# В ЛР №3 балансировщик (Apache/Nginx) настраивается отдельно; профиль demo — только для проверки.
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app1:
+    <<: *app
+    environment:
+      PORT: "3000"
+      INSTANCE_ID: app-1
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-shared-secret-for-all-instances}
+    ports:
+      - "3001:3000"
+
+  app2:
+    <<: *app
+    environment:
+      PORT: "3000"
+      INSTANCE_ID: app-2
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-shared-secret-for-all-instances}
+    ports:
+      - "3002:3000"
+
+  app3:
+    <<: *app
+    environment:
+      PORT: "3000"
+      INSTANCE_ID: app-3
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: ${SESSION_SECRET:-shared-secret-for-all-instances}
+    ports:
+      - "3003:3000"
+
+  # Только для локальной проверки балансировки (не часть задания ПР №2)
+  nginx-demo:
+    image: nginx:alpine
+    profiles: ["demo"]
+    restart: unless-stopped
+    volumes:
+      - ./nginx-demo/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:80"
+    depends_on:
+      - app1
+      - app2
+      - app3
+
+volumes:
+  redis-data:

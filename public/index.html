@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LB Web App</title>
+  <style>
+    :root {
+      --bg: #f4f6f9; --card: #fff; --text: #1d2330; --muted: #6b7280;
+      --border: #e3e7ee; --accent: #2563eb; --ok: #16a34a; --bad: #dc2626; --warn: #d97706;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0f1218; --card: #181c25; --text: #e6e9ef; --muted: #9aa3b2; --border: #2a3040; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { margin: 0 0 4px; font-size: 24px; }
+    .sub { color: var(--muted); margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .card h2 { margin: 0 0 10px; font-size: 16px; }
+    .node { font-size: 30px; font-weight: 700; color: var(--accent); word-break: break-all; }
+    .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
+    .kv dt { color: var(--muted); }
+    .kv dd { margin: 0; font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+    button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; cursor: pointer; }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    input { font: inherit; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); min-width: 0; flex: 1; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .badge.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+    .badge.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+    .big { font-size: 34px; font-weight: 700; }
+    ul.list { list-style: none; padding: 0; margin: 10px 0 0; max-height: 220px; overflow: auto; }
+    ul.list li { padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; }
+    ul.list li small { color: var(--muted); }
+    .bar { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 4px; }
+    .bar .fill { height: 10px; background: var(--accent); border-radius: 5px; min-width: 2px; }
+    .log { font-family: ui-monospace, Consolas, monospace; font-size: 13px; white-space: pre-wrap; max-height: 180px; overflow: auto; background: var(--bg); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .full { grid-column: 1 / -1; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LB Web App</h1>
+  <div class="sub">Практическая работа №2 — приложение для развёртывания за балансировщиком Apache/Nginx</div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Ответ получен от узла</h2>
+      <div class="node" id="node">…</div>
+      <dl class="kv" style="margin-top:10px">
+        <dt>hostname</dt><dd id="i-host">—</dd>
+        <dt>pid</dt><dd id="i-pid">—</dd>
+        <dt>port</dt><dd id="i-port">—</dd>
+        <dt>uptime</dt><dd id="i-uptime">—</dd>
+        <dt>через прокси</dt><dd id="i-proxy">—</dd>
+        <dt>X-Forwarded-For</dt><dd id="i-xff">—</dd>
+        <dt>хранилище</dt><dd id="i-store">—</dd>
+      </dl>
+      <div class="row">
+        <button id="btn-refresh">Обновить</button>
+        <label class="muted"><input type="checkbox" id="auto" style="flex:none;width:auto"> автообновление (1 с)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Распределение запросов по узлам</h2>
+      <div class="muted">Счётчик хранится в Redis, общий для всех экземпляров</div>
+      <div id="stats" style="margin-top:8px">—</div>
+      <div class="row">
+        <button id="btn-burst">Отправить 20 запросов</button>
+        <button class="secondary" id="btn-reset">Сбросить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Общий счётчик (Redis)</h2>
+      <div class="big" id="counter">—</div>
+      <div class="muted" id="counter-node"></div>
+      <div class="row"><button id="btn-inc">+1</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Сессия (подписанная cookie)</h2>
+      <dl class="kv">
+        <dt>имя</dt><dd id="s-name">—</dd>
+        <dt>визитов</dt><dd id="s-visits">—</dd>
+        <dt>обслуживали</dt><dd id="s-served">—</dd>
+      </dl>
+      <div class="row">
+        <input id="name" placeholder="Ваше имя" maxlength="40">
+        <button id="btn-name">Сохранить</button>
+        <button class="secondary" id="btn-sreset">Сброс</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Асинхронные запросы</h2>
+      <div class="row">
+        <button id="btn-slow">GET /api/slow?ms=3000</button>
+        <button id="btn-stream">GET /api/stream (SSE)</button>
+      </div>
+      <div class="log" id="async-log">—</div>
+    </div>
+
+    <div class="card">
+      <h2>Гостевая книга (Redis)</h2>
+      <div class="row">
+        <input id="msg" placeholder="Сообщение" maxlength="500">
+        <button id="btn-msg">Отправить</button>
+      </div>
+      <ul class="list" id="messages"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const api = (url, opts) => fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts }).then(r => r.json());
+  const storeBadge = (ok) => `<span class="badge ${ok ? 'ok' : 'bad'}">${ok ? 'redis: ok' : 'redis: недоступен'}</span>`;
+
+  async function loadInfo() {
+    const d = await api('/api/info');
+    $('node').textContent = d.instanceId;
+    $('i-host').textContent = d.hostname;
+    $('i-pid').textContent = d.pid;
+    $('i-port').textContent = d.port;
+    $('i-uptime').textContent = d.uptimeSec + ' с';
+    $('i-proxy').textContent = d.request.viaProxy ? 'да' : 'нет (прямое подключение)';
+    $('i-xff').textContent = d.request.forwardedFor || '—';
+    $('i-store').innerHTML = storeBadge(d.store.connected) + (d.store.error ? ` <span class="muted">${d.store.error}</span>` : '');
+  }
+
+  async function loadStats() {
+    const d = await api('/api/stats');
+    if (!d.perInstance) { $('stats').innerHTML = storeBadge(false); return; }
+    const entries = Object.entries(d.perInstance).sort();
+    const max = Math.max(1, ...entries.map(([, v]) => v));
+    $('stats').innerHTML = entries.map(([k, v]) =>
+      `<div class="bar"><span style="min-width:110px">${k}</span><div class="fill" style="width:${(v / max) * 100}%;max-width:60%"></div><span>${v}</span></div>`
+    ).join('') || '<span class="muted">пока нет данных</span>';
+  }
+
+  async function loadCounter() {
+    const d = await api('/api/counter');
+    $('counter').textContent = d.value ?? '—';
+    $('counter-node').textContent = d.storeAvailable ? `ответил ${d.instanceId}` : 'redis недоступен';
+  }
+
+  async function loadSession() {
+    const d = await api('/api/session');
+    $('s-name').textContent = d.session.name || '—';
+    $('s-visits').textContent = d.session.visits;
+    $('s-served').textContent = d.session.servedBy.join(' → ');
+  }
+
+  async function loadMessages() {
+    const d = await api('/api/messages');
+    $('messages').innerHTML = (d.messages || []).map(m =>
+      `<li><b>${esc(m.author)}</b>: ${esc(m.text)}<br><small>${new Date(m.time).toLocaleString()} · сохранил ${esc(m.savedBy)}</small></li>`
+    ).join('') || '<li class="muted">пусто</li>';
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const logLine = (s) => { const el = $('async-log'); el.textContent = (el.textContent === '—' ? '' : el.textContent + '\n') + s; el.scrollTop = el.scrollHeight; };
+
+  async function refreshAll() { await Promise.all([loadInfo(), loadStats(), loadCounter(), loadSession(), loadMessages()]); }
+
+  $('btn-refresh').onclick = refreshAll;
+  $('btn-inc').onclick = async () => { await api('/api/counter', { method: 'POST' }); loadCounter(); loadStats(); };
+  $('btn-burst').onclick = async () => {
+    await Promise.all(Array.from({ length: 20 }, () => fetch('/api/info', { cache: 'no-store' })));
+    loadStats();
+  };
+  $('btn-reset').onclick = async () => { await api('/api/reset', { method: 'POST' }); refreshAll(); };
+  $('btn-name').onclick = async () => { await api('/api/session/name', { method: 'POST', body: JSON.stringify({ name: $('name').value }) }); loadSession(); };
+  $('btn-sreset').onclick = async () => { await api('/api/session/reset', { method: 'POST' }); loadSession(); };
+  $('btn-msg').onclick = async () => {
+    const text = $('msg').value; if (!text.trim()) return;
+    await api('/api/messages', { method: 'POST', body: JSON.stringify({ text }) });
+    $('msg').value = ''; loadMessages(); loadStats();
+  };
+  $('btn-slow').onclick = async () => {
+    const t0 = performance.now(); logLine('slow: запрос отправлен…');
+    const d = await api('/api/slow?ms=3000');
+    logLine(`slow: ответ от ${d.instanceId} за ${Math.round(performance.now() - t0)} мс`);
+  };
+  $('btn-stream').onclick = () => {
+    logLine('stream: подключение…');
+    const es = new EventSource('/api/stream?count=5&interval=1000');
+    es.onmessage = (e) => { const d = JSON.parse(e.data); logLine(`stream: tick ${d.tick} от ${d.instanceId}`); };
+    es.addEventListener('end', () => { logLine('stream: завершён'); es.close(); });
+    es.onerror = () => { logLine('stream: ошибка/закрыт'); es.close(); };
+  };
+
+  let timer = null;
+  $('auto').onchange = (e) => {
+    clearInterval(timer);
+    if (e.target.checked) timer = setInterval(() => { loadInfo(); loadStats(); }, 1000);
+  };
+
+  refreshAll();
+</script>
+</body>
+</html>

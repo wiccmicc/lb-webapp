@@ -1,0 +1,22 @@
+{
+  "name": "lb-webapp",
+  "version": "1.0.0",
+  "description": "Web application for deployment behind Apache/Nginx reverse proxy with load balancing (Practice #2)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "cluster": "node scripts/start-cluster.js",
+    "mini-redis": "node scripts/mini-redis.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "cookie-session": "^2.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ioredis": "^5.4.1"
+  }
+}
